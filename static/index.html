@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Freifunk Hamburg - fastd Key eintragen</title>
+
+    <link rel="stylesheet" type="text/css" href="/css/style.css" />
+    <link rel="stylesheet" type="text/css" href="/css/bootstrap.min.css" />
+    <script src="/js/jquery-1.8.3.min.js"></script>
+    <script src="/js/bootstrap.min.js"></script>
+
+    <script>
+        var validationMessages = {
+            key: "Der angegebene VPN-Schlüssel ist ungültig.",
+            hostname: "Knotennamen dürfen maximal 32 Zeichen lang sein und nur Klein- und Großbuchstaben, sowie Ziffern und _ enthalten.",
+            email: "Die angegebene E-Mail-Adresse ist ungültig."
+        };
+
+        function feedback(cls, msg) {
+            var html = "";
+            html += "<div class=\"alert " + cls + "\">";
+            html += msg;
+            html += "<a class=\"close\" data-dismiss=\"alert\" href=\"#\">&times;</a>";
+            html += "</div>";
+
+            var div = $(html);
+            $("#feedback").append(div);
+        }
+
+        function clearFeedback() {
+            $("#feedback").empty();
+        }
+
+        function success(msg) {
+            feedback("alert-success", msg);
+        }
+
+        function error(msg) {
+            feedback("alert-error", msg);
+        }
+
+        function updateValidationErrors(fields) {
+            $(".input.error").toggleClass("error", false);
+            $(".input .feedback").empty();
+
+            for (var i = 0; i < fields.length; i++) {
+                var field = fields[i];
+                $(".input." + field).toggleClass("error", true);
+                $(".input." + field + " .feedback").text(validationMessages[field]);
+            }
+        }
+
+        function handleSubmit(e) {
+            if (e) {
+                e.preventDefault();
+            }
+
+            clearFeedback();
+            updateValidationErrors([]);
+
+            var hostname = $("input[name=hostname]").val();
+            var key = $("input[name=key]").val();
+            var email = $("input[name=email]").val();
+
+            $.ajax("/api/node", {
+                type: "POST",
+                data: {
+                    hostname: hostname,
+                    key: key,
+                    email: email
+                },
+                success: function () {
+                    success("Glückwunsch, der Knoten ist jetzt angemeldet!");
+                },
+                error: function (jqxhr) {
+                    var result = JSON.parse(jqxhr.responseText);
+
+                    switch (result.type) {
+                        case "ValidationError":
+                            updateValidationErrors(result.validationResult.invalid);
+                        break;
+                        case "NodeEntryAlreadyExistsError":
+                            error("Für den Knoten " + result.hostname + " existiert bereits ein Eintrag.");
+                        break;
+                        default:
+                            error("Es ist ein unerwarteter Fehler aufgetreten.");
+                    }
+                }
+            });
+
+            return false;
+        }
+
+        $(document).ready(function () {
+            $("form").submit(handleSubmit);
+        });
+    </script>
+
+</head>
+
+<body>
+    <div class="page-header">
+        <h1>Knoten anmelden</h1>
+    </div>
+
+    <div class="well">
+        <form method="post">
+            <div id="feedback"></div>
+            <fieldset>
+                <div class="input hostname">
+                    <label for="hostname">Knotenname</label><input type="text" name="hostname" />
+                    <span class="feedback"></span>
+                </div>
+                <div class="input key">
+                    <label for="key">VPN-Schlüssel</label><input type="text" name="key" />
+                    <span class="feedback"></span>
+                </div>
+                <div class="input email">
+                    <label for="email">Kontakt E-Mail-Adresse (freiwillig)</label><input type="text" name="email" />
+                    <span class="feedback"></span>
+                </div>
+                <button class="btn btn-primary" type="submit">Knoten eintragen</button>
+            </fieldset>
+        </form>
+    </div>
+</body>
+
+</html>
+

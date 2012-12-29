@@ -1,0 +1,9 @@
+form .error,
+form .error input {
+    color: #B94A48;
+}
+
+form label {
+    font-weight: bold;
+}
+
