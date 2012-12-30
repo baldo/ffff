@@ -13,8 +13,11 @@
     <script>
         var validationMessages = {
             key: "Der angegebene VPN-Schlüssel ist ungültig.",
-            hostname: "Knotennamen dürfen maximal 32 Zeichen lang sein und nur Klein- und Großbuchstaben, sowie Ziffern und _ enthalten.",
-            email: "Die angegebene E-Mail-Adresse ist ungültig."
+            hostname: "Knotennamen dürfen maximal 32 Zeichen lang sein und nur Klein- und Großbuchstaben, sowie Ziffern, - und _ enthalten.",
+            email: "Die angegebene E-Mail-Adresse ist ungültig.",
+            nickname: "Nicknames dürfen maximal 64 Zeichen lang sein und nur Klein- und Großbuchstaben, sowie Ziffern, - und _ enthalten. Umlaute sind erlaubt.",
+            mac: "Die angegebene MAC-Adresse ist ungültig.",
+            coords: "Bitte gib die Koordinaten wie folgt an, Beispiel: 54.326230588201 10.101561821008"
         };
 
         function feedback(cls, msg) {
@@ -62,13 +65,19 @@
             var hostname = $("input[name=hostname]").val();
             var key = $("input[name=key]").val();
             var email = $("input[name=email]").val();
+            var nickname= $("input[name=nickname]").val();
+            var coords = $("input[name=coords]").val();
+            var mac = $("input[name=mac]").val();
 
             $.ajax("/api/node", {
                 type: "POST",
                 data: {
                     hostname: hostname,
                     key: key,
-                    email: email
+                    email: email,
+                    nickname: nickname,
+                    coords: coords,
+                    mac: mac
                 },
                 success: function () {
                     success("Glückwunsch, der Knoten ist jetzt angemeldet!");
@@ -78,7 +87,7 @@
 
                     switch (result.type) {
                         case "ValidationError":
-                            updateValidationErrors(result.validationResult.invalid);
+                            updateValidationErrors(result.validationResult.missing.concat(result.validationResult.invalid));
                         break;
                         case "NodeEntryAlreadyExistsError":
                             error("Für den Knoten " + result.hostname + " existiert bereits ein Eintrag.");
@@ -116,8 +125,20 @@
                     <label for="key">VPN-Schlüssel</label><input type="text" name="key" />
                     <span class="feedback"></span>
                 </div>
+                <div class="input mac">
+                    <label for="mac">MAC-Adresse</label><input type="text" name="mac" />
+                    <span class="feedback"></span>
+                </div>
+                <div class="input nickname">
+                    <label for="nickname">Kontakt - Nickname / Name (freiwillig)</label><input type="text" name="nickname" />
+                    <span class="feedback"></span>
+                </div>
                 <div class="input email">
-                    <label for="email">Kontakt E-Mail-Adresse (freiwillig)</label><input type="text" name="email" />
+                    <label for="email">Kontakt - E-Mail-Adresse (freiwillig)</label><input type="text" name="email" />
+                    <span class="feedback"></span>
+                </div>
+                <div class="input coords">
+                    <label for="coords">Koordinaten des Knotens (freiwillig)</label><input type="text" name="coords" />
                     <span class="feedback"></span>
                 </div>
                 <button class="btn btn-primary" type="submit">Knoten eintragen</button>

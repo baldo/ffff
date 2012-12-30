@@ -22,19 +22,33 @@ ValidationError.prototype.getResult = function () {
     return this._result;
 };
 
+function normalizeString(str) {
+    return str.trim().replace(/\s+/g, " ");
+}
+
 function validate(constraints) {
     return function (req, res, next) {
         var invalid = [];
         var unknown = [];
+        var missing = [];
         var result = {
             hasErrors: false
         };
 
         var data = req.body;
 
-        for (var key in data) {
+        var key;
+
+        for (key in constraints) {
+            if (data[key] === null || data[key] === undefined) {
+                missing.push(key);
+                result.hasErrors = true;
+            }   
+        }
+
+        for (key in data) {
             if (data.hasOwnProperty(key)) {
-                var value = data[key].trim();
+                var value = normalizeString(data[key]);
 
                 if (!constraints[key]) {
                     unknown.push(key);
@@ -47,13 +61,9 @@ function validate(constraints) {
             }
         }
 
-        if (invalid.length > 0) {
-            result.invalid = invalid;
-        }
-
-        if (unknown.length > 0) {
-            result.unknown = unknown;
-        }
+        result.missing = missing;
+        result.invalid = invalid;
+        result.unknown = unknown;
 
         if (result.hasErrors) {
             return next(new ValidationError(result));
@@ -81,9 +91,12 @@ app.get("/", function(req, res, next) {
 });
 
 var constraints = {
-    hostname: /^[a-zA-Z0-9_]{1,32}$/,
+    hostname: /^[-a-zA-Z0-9_]{1,32}$/,
     key: /^[a-fA-F0-9]{64}$/,
-    email: /^([a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)?$/
+    email: /^([a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)?$/,
+    nickname: /^([-a-zA-Z0-9_ äöüÄÖÜß]{1,64})?$/,
+    mac: /^([a-fA-F0-9]{12}|([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})$/,
+    coords: /^(-?[0-9]{1,3}(\.[0-9]{1,12})? -?[0-9]{1,3}(\.[0-9]{1,12})?)?$/
 };
 
 var NodeEntryAlreadyExistsError = function (hostname) {
@@ -95,16 +108,35 @@ NodeEntryAlreadyExistsError.prototype.getHostname = function () {
     return this._hostname;
 };
 
+function normalizeMac(mac) {
+    // parts only contains values at odd indexes
+    var parts = mac.toUpperCase().replace(/:/g, "").split(/([A-F0-9]{2})/);
+
+    var macParts = [];
+
+    for (var i = 1; i < parts.length; i += 2) {
+        macParts.push(parts[i]);
+    }
+
+    return macParts.join(":");
+}
+
 function createNodeFile(req, res, next) {
-    var hostname = req.body.hostname.trim();
-    var key = req.body.key.trim();
-    var email = req.body.email.trim();
+    var hostname = normalizeString(req.body.hostname);
+    var key = normalizeString(req.body.key);
+    var email = normalizeString(req.body.email);
+    var nickname = normalizeString(req.body.nickname);
+    var mac = normalizeMac(normalizeString(req.body.mac));
+    var coords = normalizeString(req.body.coords);
 
     var filename = peersPath + "/" + hostname;
     var data = "";
 
     data += "# Knotenname: " + hostname + "\n";
+    data += "# Ansprechpartner: " + nickname + "\n";
     data += "# Kontakt: " + email + "\n";
+    data += "# Koordinaten: " + coords + "\n";
+    data += "# MAC: " + mac + "\n";
     data += "key \"" + key + "\";\n";
 
     console.log("Creating new node file: " + filename);
