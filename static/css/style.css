@@ -1,3 +1,7 @@
+body {
+    padding: 20px;
+}
+
 form .error,
 form .error input {
     color: #B94A48;
