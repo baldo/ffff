@@ -5,10 +5,10 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>Freifunk Hamburg - fastd Key eintragen</title>
 
-    <link rel="stylesheet" type="text/css" href="/css/style.css" />
-    <link rel="stylesheet" type="text/css" href="/css/bootstrap.min.css" />
-    <script src="/js/jquery-1.8.3.min.js"></script>
-    <script src="/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/style.css" />
+    <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css" />
+    <script src="js/jquery-1.8.3.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
 
     <script>
         var validationMessages = {
@@ -102,6 +102,7 @@
         }
 
         $(document).ready(function () {
+            $("form button[type='submit']").removeAttr("disabled");
             $("form").submit(handleSubmit);
         });
     </script>
@@ -112,6 +113,15 @@
     <div class="page-header">
         <h1>Knoten anmelden</h1>
     </div>
+
+    <noscript>
+        <div class="alert alert-block alert-error">
+            <h4>Achtung!</h4>
+            Du hast kein JavaScript aktiviert oder dein Browser unterstützt kein
+            JavaScript. Bitte aktiviere JavaScript oder nutze einen anderen Browser,
+            um deinen Freifunk-Knoten registrieren zu können.
+        </div>
+    </noscript>
 
     <div class="well">
         <form method="post">
@@ -145,7 +155,7 @@
                     klickst.</p>
                     <span class="feedback"></span>
                 </div>
-                <button class="btn btn-primary" type="submit">Knoten eintragen</button>
+                <button class="btn btn-primary" type="submit" disabled="disabled">Knoten eintragen</button>
             </fieldset>
         </form>
     </div>
