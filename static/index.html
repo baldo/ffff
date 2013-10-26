@@ -37,20 +37,21 @@
 
         function success(msg) {
             feedback("alert-success", msg);
+            $("form")[0].reset();            
         }
 
         function error(msg) {
-            feedback("alert-error", msg);
+            feedback("alert-danger", msg);
         }
 
         function updateValidationErrors(fields) {
-            $(".input.error").toggleClass("error", false);
-            $(".input .feedback").empty();
+            $(".form-group.has-error").toggleClass("has-error", false);
+            $(".form-group .feedback").empty();
 
             for (var i = 0; i < fields.length; i++) {
                 var field = fields[i];
-                $(".input." + field).toggleClass("error", true);
-                $(".input." + field + " .feedback").text(validationMessages[field]);
+                $(".form-group." + field).toggleClass("has-error", true);
+                $(".form-group." + field + " .feedback").text(validationMessages[field]);
             }
         }
 
@@ -102,7 +103,7 @@
         }
 
         $(document).ready(function () {
-            $("form button[type='submit']").removeAttr("disabled");
+            $("form button[type='submit'],form input[type='text']").removeAttr("disabled");
             $("form").submit(handleSubmit);
         });
     </script>
@@ -110,54 +111,73 @@
 </head>
 
 <body>
-    <div class="page-header">
-        <h1>Knoten anmelden</h1>
+    <div class="navbar navbar-default navbar-fixed-top">
+      <div class="container">
+        <div class="navbar-header">
+          <a class="navbar-brand" href="https://hamburg.freifunk.net">hamburg.freifunk.net</a>
+        </div>
+      </div>
     </div>
 
-    <noscript>
-        <div class="alert alert-block alert-error">
-            <h4>Achtung!</h4>
-            Du hast kein JavaScript aktiviert oder dein Browser unterstützt kein
-            JavaScript. Bitte aktiviere JavaScript oder nutze einen anderen Browser,
-            um deinen Freifunk-Knoten registrieren zu können.
-        </div>
-    </noscript>
+    <div class="container">
+        <h1>Knoten anmelden</h1>
 
-    <div class="well">
-        <form method="post">
-            <div id="feedback"></div>
-            <fieldset>
-                <div class="input hostname">
-                    <label for="hostname">Knotenname</label><input type="text" name="hostname" />
-                    <span class="feedback"></span>
+        <div class="container well">
+            <noscript>
+                <div class="alert alert-danger">
+                    <h4>Achtung!</h4>
+                    Du hast kein JavaScript aktiviert oder dein Browser unterstützt kein
+                    JavaScript. Bitte aktiviere JavaScript oder nutze einen anderen Browser,
+                    um deinen Freifunk-Knoten registrieren zu können.
                 </div>
-                <div class="input key">
-                    <label for="key">VPN-Schlüssel (bitte nur weglassen, wenn du weisst, was du tust)</label><input type="text" name="key" />
-                    <span class="feedback"></span>
-                </div>
-                <div class="input mac">
-                    <label for="mac">MAC-Adresse</label><input type="text" name="mac" />
-                    <span class="feedback"></span>
-                </div>
-                <div class="input nickname">
-                    <label for="nickname">Kontakt - Nickname / Name</label><input type="text" name="nickname" />
-                    <span class="feedback"></span>
-                </div>
-                <div class="input email">
-                    <label for="email">Kontakt - E-Mail-Adresse</label><input type="text" name="email" />
-                    <span class="feedback"></span>
-                </div>
-                <div class="input coords">
-                    <label for="coords">Koordinaten des Knotens (freiwillig)</label><input type="text" name="coords" />
-                    <p>Du kannst die Koordinaten in der <a target="_blank" href="http://freifunk-gw01.hamburg.ccc.de/ffhhmap/geomap.html">Knotenkarte</a>
-                    rausfinden, indem du zum Standort des Knotens gehst, dann oben "Koordinaten beim
-                    nächsten Klick anzeigen" klickst und dann auf der Karte auf den genauen Standort
-                    klickst.</p>
-                    <span class="feedback"></span>
-                </div>
-                <button class="btn btn-primary" type="submit" disabled="disabled">Knoten eintragen</button>
-            </fieldset>
-        </form>
+            </noscript>
+
+            <form method="post" role="form">
+                <div id="feedback"></div>
+                <fieldset>
+                    <div class="form-group hostname">
+                        <label class="control-label" for="hostname">Knotenname</label>
+                        <input type="text" disabled="disabled" class="form-control" name="hostname" placeholder="Knotenname" />
+                        <span class="feedback help-block"></span>
+                    </div>
+                    <div class="form-group key">
+                        <label class="control-label" for="key">VPN-Schlüssel (bitte nur weglassen, wenn du weisst, was du tust)</label>
+                        <input type="text" disabled="disabled" class="form-control" name="key" placeholder="VPN-Schlüssel" />
+                        <span class="feedback help-block"></span>
+                    </div>
+                    <div class="form-group mac">
+                        <label class="control-label" for="mac">MAC-Adresse</label>
+                        <input type="text" disabled="disabled" class="form-control" name="mac" placeholder="MAC-Adresse" />
+                        <span class="feedback help-block"></span>
+                    </div>
+                    <div class="form-group nickname">
+                        <label class="control-label" for="nickname">Kontakt - Nickname / Name</label>
+                        <input type="text" disabled="disabled" class="form-control" name="nickname" placeholder="Kontakt - Nickname / Name" />
+                        <span class="feedback help-block"></span>
+                    </div>
+                    <div class="form-group email">
+                        <label class="control-label" for="email">Kontakt - E-Mail-Adresse</label>
+                        <input type="text" disabled="disabled" class="form-control" name="email" placeholder="Kontakt - E-Mail-Adresse" />
+                        <span class="feedback help-block"></span>
+                    </div>
+                    <div class="form-group coords">
+                        <label class="control-label" for="coords">Koordinaten des Knotens (freiwillig)</label>
+                        <input type="text" disabled="disabled" class="form-control" name="coords" placeholder="Koordinaten" />
+                        <span class="feedback help-block"></span>
+                        <span class="help-block">
+                            Du kannst die Koordinaten in der <a target="_blank" href="http://freifunk-gw01.hamburg.ccc.de/ffhhmap/geomap.html">Knotenkarte</a>
+                            rausfinden, indem du zum Standort des Knotens gehst, dann oben "Koordinaten beim
+                            nächsten Klick anzeigen" klickst und dann auf der Karte auf den genauen Standort
+                            klickst.
+                        </span>
+                    </div>
+                    <button class="btn btn-primary" type="submit" disabled="disabled">
+                        <strong>+</strong>
+                        Knoten eintragen
+                    </button>
+                </fieldset>
+            </form>
+        </div>
     </div>
 </body>
 
