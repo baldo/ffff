@@ -93,6 +93,12 @@
                         case "NodeEntryAlreadyExistsError":
                             error("Für den Knoten " + result.hostname + " existiert bereits ein Eintrag.");
                         break;
+                        case "MacEntryAlreadyExistsError":
+                            error("Für die MAC-Adresse " + result.mac + " existiert bereits ein Eintrag.");
+                        break;
+                        case "KeyEntryAlreadyExistsError":
+                            error("Für den VPN-Schlüssel " + result.key + " existiert bereits ein Eintrag.");
+                        break;
                         default:
                             error("Es ist ein unerwarteter Fehler aufgetreten.");
                     }

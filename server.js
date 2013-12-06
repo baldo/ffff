@@ -8,6 +8,7 @@ var peersPath = "/tmp/peers"; // needs to exist already
 
 var express = require("express");
 var fs = require("fs");
+var glob = require("glob");
 
 
 // validation
@@ -108,6 +109,24 @@ NodeEntryAlreadyExistsError.prototype.getHostname = function () {
     return this._hostname;
 };
 
+var MacEntryAlreadyExistsError = function (mac) {
+    this._mac = mac;
+};
+
+MacEntryAlreadyExistsError.prototype = new Error();
+MacEntryAlreadyExistsError.prototype.getMac = function () {
+    return this._mac;
+};
+
+var KeyEntryAlreadyExistsError = function (key) {
+    this._key = key;
+};
+
+KeyEntryAlreadyExistsError.prototype = new Error();
+KeyEntryAlreadyExistsError.prototype.getKey = function () {
+    return this._key;
+};
+
 function normalizeMac(mac) {
     // parts only contains values at odd indexes
     var parts = mac.toUpperCase().replace(/:/g, "").split(/([A-F0-9]{2})/);
@@ -121,6 +140,10 @@ function normalizeMac(mac) {
     return macParts.join(":");
 }
 
+function exists(pattern) {
+    return glob.sync(peersPath + "/" + pattern).length > 0;
+}
+
 function createNodeFile(req, res, next) {
     var hostname = normalizeString(req.body.hostname);
     var key = normalizeString(req.body.key);
@@ -129,7 +152,7 @@ function createNodeFile(req, res, next) {
     var mac = normalizeMac(normalizeString(req.body.mac));
     var coords = normalizeString(req.body.coords);
 
-    var filename = peersPath + "/" + hostname;
+    var filename = peersPath + "/" + hostname + "@" + mac + "@" + key;
     var data = "";
 
     data += "# Knotenname: " + hostname + "\n";
@@ -137,7 +160,9 @@ function createNodeFile(req, res, next) {
     data += "# Kontakt: " + email + "\n";
     data += "# Koordinaten: " + coords + "\n";
     data += "# MAC: " + mac + "\n";
-    data += "key \"" + key + "\";\n";
+    if (key) {
+        data += "key \"" + key + "\";\n";
+    }
 
     console.log("Creating new node file: " + filename);
     console.log(data);
@@ -149,16 +174,42 @@ function createNodeFile(req, res, next) {
 
     // since node.js is single threaded we don't need a lock
     
-    var exists = true;
+    var hostnameExists = true;
     try {
-        exists =  fs.existsSync(filename);
+        hostnameExists = exists(hostname + "@*@*");
     }
     catch (err) {
         return errorHandler(err);
     }
 
-    if (exists) {
+    if (hostnameExists) {
         return errorHandler(new NodeEntryAlreadyExistsError(hostname));
+    }
+
+    var macExists = true;
+    try {
+        macExists = exists("*@" + mac + "@*");
+    }
+    catch (err) {
+        return errorHandler(err);
+    }
+
+    if (macExists) {
+        return errorHandler(new MacEntryAlreadyExistsError(mac));
+    }
+
+    if (key) {
+        var keyExists = true;
+        try {
+            keyExists = exists("*@*@" + key);
+        }
+        catch (err) {
+            return errorHandler(err);
+        }
+
+        if (keyExists) {
+            return errorHandler(new KeyEntryAlreadyExistsError(key));
+        }
     }
 
     try {
@@ -194,6 +245,20 @@ app.use(function(err, req, res, next) {
             status: "error",
             type: "NodeEntryAlreadyExistsError",
             hostname: err.getHostname()
+        });
+    }
+    else if (err instanceof MacEntryAlreadyExistsError) {
+        return respondWithJson(res, 409, {
+            status: "error",
+            type: "MacEntryAlreadyExistsError",
+            mac: err.getMac()
+        });
+    }
+    else if (err instanceof KeyEntryAlreadyExistsError) {
+        return respondWithJson(res, 409, {
+            status: "error",
+            type: "KeyEntryAlreadyExistsError",
+            key: err.getKey()
         });
     }
     else if (err) {
