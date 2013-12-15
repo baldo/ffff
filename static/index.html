@@ -8,6 +8,7 @@
     <link rel="stylesheet" type="text/css" href="css/style.css" />
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css" />
     <script src="js/jquery-1.8.3.min.js"></script>
+    <script src="js/underscore-1.5.2.min.js"></script>
     <script src="js/bootstrap.min.js"></script>
 
     <script>
@@ -20,58 +21,123 @@
             coords: "Bitte gib die Koordinaten wie folgt an, Beispiel: 54.326230588201 10.101561821008"
         };
 
-        function feedback(cls, msg) {
+        function feedback(formId, cls, msg) {
             var html = "";
             html += "<div class=\"alert " + cls + "\">";
             html += msg;
-            html += "<a class=\"close\" data-dismiss=\"alert\" href=\"#\">&times;</a>";
             html += "</div>";
 
             var div = $(html);
-            $("#feedback").append(div);
+            $("form#" + formId + " #feedback").append(div);
         }
 
-        function clearFeedback() {
-            $("#feedback").empty();
+        function clearFeedback(formId) {
+            $("form#" + formId + " #feedback").empty();
         }
 
-        function success(msg) {
-            feedback("alert-success", msg);
-            $("form")[0].reset();            
+        function success(id, msg) {
+            feedback(id, "alert-success", msg);
+            $("form#" + id + " input").val("");
+            $("form#" + id)[0].reset();
         }
 
-        function error(msg) {
-            feedback("alert-danger", msg);
+        function error(id, msg) {
+            feedback(id, "alert-danger", msg);
         }
 
-        function updateValidationErrors(fields) {
-            $(".form-group.has-error").toggleClass("has-error", false);
-            $(".form-group .feedback").empty();
+        function updateValidationErrors(formId, fields) {
+            $("form#" + formId + " .form-group.has-error").toggleClass("has-error", false);
+            $("form#" + formId + " .form-group .feedback").empty();
 
-            for (var i = 0; i < fields.length; i++) {
-                var field = fields[i];
-                $(".form-group." + field).toggleClass("has-error", true);
-                $(".form-group." + field + " .feedback").text(validationMessages[field]);
+            _.each(fields, function (field) {
+                $("form#" + formId + " .form-group." + field).toggleClass("has-error", true);
+                $("form#" + formId + " .form-group." + field + " .feedback").text(validationMessages[field]);
+
+                if (field === "token") {
+                    error(formId, "Ungültiges Token!");
+                }
+            });
+        }
+
+        function handleError(formId, jqxhr) {
+            var result = JSON.parse(jqxhr.responseText);
+
+            switch (result.type) {
+                case "ValidationError":
+                    updateValidationErrors(formId, result.validationResult.missing.concat(result.validationResult.invalid));
+                break;
+                case "NodeEntryAlreadyExistsError":
+                    error(formId, "Für den Knoten " + result.hostname + " existiert bereits ein Eintrag.");
+                break;
+                case "MacEntryAlreadyExistsError":
+                    error(formId, "Für die MAC-Adresse " + result.mac + " existiert bereits ein Eintrag.");
+                break;
+                case "KeyEntryAlreadyExistsError":
+                    error(formId, "Für den VPN-Schlüssel " + result.key + " existiert bereits ein Eintrag.");
+                break;
+                case "NodeNotFoundError":
+                    error(formId, "Zum Token " + result.token + " konnte kein Knoten gefunden werden.");
+                break;
+                default:
+                    error(formId, "Es ist ein unerwarteter Fehler aufgetreten.");
             }
         }
 
-        function handleSubmit(e) {
+        function handleTokenSubmit(e) {
             if (e) {
                 e.preventDefault();
             }
 
-            clearFeedback();
-            updateValidationErrors([]);
+            clearFeedback("token-form");
+            updateValidationErrors("token-form", []);
 
-            var hostname = $("input[name=hostname]").val();
-            var key = $("input[name=key]").val();
-            var email = $("input[name=email]").val();
-            var nickname= $("input[name=nickname]").val();
-            var coords = $("input[name=coords]").val();
-            var mac = $("input[name=mac]").val();
+            var token = $("form#token-form input[name=token]").val();
+            console.log("Token:", token);
 
-            $.ajax("/api/node", {
-                type: "POST",
+            if (!token) {
+                error("token-form", "Es ist kein Token angegeben.");
+                return false;
+            }
+
+            $.ajax("/api/node/" + token, {
+                type: "GET",
+                success: function (data) {
+                    success("node-form", "Du kannst die Daten deines Knotens jetzt anpassen.");
+                    $("form#token-form input").val("");
+                    init("node-container", data);
+                },
+                error: function (jqxhr) {
+                    handleError("token-form", jqxhr);
+                }
+            });
+
+            return false;
+        }
+
+        function handleNodeSubmit(e) {
+            if (e) {
+                e.preventDefault();
+            }
+
+            clearFeedback("node-form");
+            updateValidationErrors("node-form", []);
+
+            var hostname = $("#node-form input[name=hostname]").val();
+            var key = $("#node-form input[name=key]").val();
+            var email = $("#node-form input[name=email]").val();
+            var nickname= $("#node-form input[name=nickname]").val();
+            var coords = $("#node-form input[name=coords]").val();
+            var mac = $("#node-form input[name=mac]").val();
+
+            var url = "/api/node";
+
+            var token = $("#node-form input[name=token]").val();
+            if (token) {
+                url += "/" + token;
+            }
+
+            $.ajax(url, {
+                type: token ? "PUT" : "POST",
                 data: {
                     hostname: hostname,
                     key: key,
@@ -80,37 +146,74 @@
                     coords: coords,
                     mac: mac
                 },
-                success: function () {
-                    success("Glückwunsch, der Knoten ist jetzt angemeldet!");
+                success: function (data) {
+                    success(
+                        "node-form",
+                        "Glückwunsch, der Knoten ist jetzt angemeldet! " +
+                        "Die Daten deines Kntoen kannst du später über folgendes Token aktualisieren: <br />" +
+                        "<strong>" + data.token + "</strong>"
+                    );
                 },
                 error: function (jqxhr) {
-                    var result = JSON.parse(jqxhr.responseText);
-
-                    switch (result.type) {
-                        case "ValidationError":
-                            updateValidationErrors(result.validationResult.missing.concat(result.validationResult.invalid));
-                        break;
-                        case "NodeEntryAlreadyExistsError":
-                            error("Für den Knoten " + result.hostname + " existiert bereits ein Eintrag.");
-                        break;
-                        case "MacEntryAlreadyExistsError":
-                            error("Für die MAC-Adresse " + result.mac + " existiert bereits ein Eintrag.");
-                        break;
-                        case "KeyEntryAlreadyExistsError":
-                            error("Für den VPN-Schlüssel " + result.key + " existiert bereits ein Eintrag.");
-                        break;
-                        default:
-                            error("Es ist ein unerwarteter Fehler aufgetreten.");
-                    }
+                    handleError("node-form", jqxhr);
                 }
             });
 
             return false;
         }
 
+        function getQueryParams() {
+            var queryString = window.location.search;
+            if (!queryString || queryString === "?") {
+                return {};
+            }
+
+            var result = {};
+            var params = queryString.substr(1).split("&");
+            _.each(params, function (param) {
+                var parts = param.split("=");
+                var key = parts[0];
+                var value = parts[1];
+                if (key === "token") {
+                    return;
+                }
+                result[key] = value;
+            });
+
+            return result;
+        }
+
+        function cancel(formId, e) {
+            clearFeedback(formId);
+            updateValidationErrors(formId, []);
+            $("form#" + formId + " input").val("");
+            init("action-container", {});
+        } 
+
+        function init(id, data) {
+            _.each(data, function (value, key) {
+                $("form#node-form input[name=" +  key + "]").val(value);
+            });
+
+            if (!_.isEmpty(data)) {
+                id = "node-container";
+            }
+
+            $(".container.well").toggleClass("hidden", true);
+            $("#" + id).toggleClass("hidden", false);
+        }
+
         $(document).ready(function () {
-            $("form button[type='submit'],form input[type='text']").removeAttr("disabled");
-            $("form").submit(handleSubmit);
+            var queryParams = getQueryParams();
+            init("action-container", queryParams);
+
+            $("form button,form input").removeAttr("disabled");
+            $("form#token-form").submit(handleTokenSubmit);
+            $("form#node-form").submit(handleNodeSubmit);
+            $("#add-node").click(_.partial(init, "node-container", {}));
+            $("#edit-node").click(_.partial(init, "token-container", {}));
+            $("#token-cancel").click(_.partial(cancel, "token-form", {}));
+            $("#node-cancel").click(_.partial(cancel, "node-form", {}));
         });
     </script>
 
@@ -126,21 +229,56 @@
     </div>
 
     <div class="container">
-        <h1>Knoten anmelden</h1>
+        <h1>Knotenverwaltung</h1>
 
-        <div class="container well">
-            <noscript>
-                <div class="alert alert-danger">
-                    <h4>Achtung!</h4>
-                    Du hast kein JavaScript aktiviert oder dein Browser unterstützt kein
-                    JavaScript. Bitte aktiviere JavaScript oder nutze einen anderen Browser,
-                    um deinen Freifunk-Knoten registrieren zu können.
-                </div>
-            </noscript>
+        <noscript>
+            <div class="alert alert-danger">
+                <h4>Achtung!</h4>
+                Du hast kein JavaScript aktiviert oder dein Browser unterstützt kein
+                JavaScript. Bitte aktiviere JavaScript oder nutze einen anderen Browser,
+                um deinen Freifunk-Knoten registrieren zu können.
+            </div>
+        </noscript>
 
-            <form method="post" role="form">
+        <div id="action-container" class="container well hidden">
+            <h2>Was möchtest du tun?</h2>
+
+            <button id="add-node" class="btn btn-primary">+ Knoten neu anmelden</button>
+            <strong>oder</strong>
+            <button id="edit-node" class="btn btn-primary">&gt; Knotendaten ändern</button>
+        </div>
+
+        <div id="token-container" class="container well hidden">
+            <h2>Knotendaten ändern</h2>
+
+            <form method="post" role="form" id="token-form">
                 <div id="feedback"></div>
                 <fieldset>
+                    <div class="form-group token">
+                        <label class="control-label" for="token">Token</label>
+                        <input type="text" disabled="disabled" class="form-control" name="token" placeholder="Token" />
+                        <span class="feedback help-block"></span>
+                    </div>
+                    <button id="token-cancel" class="btn btn-secondary" type="reset" disabled="disabled">
+                        <strong>&lt;</strong>
+                        Abbrechen
+                    </button>
+                    <button class="btn btn-primary" type="submit" disabled="disabled">
+                        <strong>&gt;</strong>
+                        Knotendaten ändern 
+                    </button>
+                </fieldset>
+            </form>
+        </div>
+
+        <div id="node-container" class="container well hidden">
+            <h2>Knotendaten</h2>
+            
+            <form method="post" role="form" id="node-form">
+                <div id="feedback"></div>
+                <fieldset>
+                    <input type="hidden" name="token" />
+
                     <div class="form-group hostname">
                         <label class="control-label" for="hostname">Knotenname</label>
                         <input type="text" disabled="disabled" class="form-control" name="hostname" placeholder="Knotenname" />
@@ -177,6 +315,10 @@
                             klickst.
                         </span>
                     </div>
+                    <button id="node-cancel" class="btn btn-secondary" type="reset" disabled="disabled">
+                        <strong>&lt;</strong>
+                        Abbrechen
+                    </button>
                     <button class="btn btn-primary" type="submit" disabled="disabled">
                         <strong>+</strong>
                         Knoten eintragen

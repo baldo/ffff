@@ -9,6 +9,8 @@ var peersPath = "/tmp/peers"; // needs to exist already
 var express = require("express");
 var fs = require("fs");
 var glob = require("glob");
+var _ = require("underscore");
+var crypto = require("crypto");
 
 
 // validation
@@ -24,7 +26,11 @@ ValidationError.prototype.getResult = function () {
 };
 
 function normalizeString(str) {
-    return str.trim().replace(/\s+/g, " ");
+    return _.isString(str) ? str.trim().replace(/\s+/g, " ") : str;
+}
+
+function getData(req) {
+    return _.extend({}, req.body, req.params);
 }
 
 function validate(constraints) {
@@ -36,7 +42,7 @@ function validate(constraints) {
             hasErrors: false
         };
 
-        var data = req.body;
+        var data = getData(req);
 
         var key;
 
@@ -100,6 +106,12 @@ var constraints = {
     coords: /^(-?[0-9]{1,3}(\.[0-9]{1,15})? -?[0-9]{1,3}(\.[0-9]{1,15})?)?$/
 };
 
+var tokenConstraint = {
+    token: /^[a-f0-9]{16}/
+};
+
+var constraintsWithToken = _.extend({}, constraints, tokenConstraint);
+
 var NodeEntryAlreadyExistsError = function (hostname) {
     this._hostname = hostname;
 };
@@ -127,6 +139,15 @@ KeyEntryAlreadyExistsError.prototype.getKey = function () {
     return this._key;
 };
 
+var NodeNotFoundError = function (token) {
+    this._token = token;
+};
+
+NodeNotFoundError.prototype = new Error();
+NodeNotFoundError.prototype.getToken = function () {
+    return this._token;
+};
+
 function normalizeMac(mac) {
     // parts only contains values at odd indexes
     var parts = mac.toUpperCase().replace(/:/g, "").split(/([A-F0-9]{2})/);
@@ -140,19 +161,62 @@ function normalizeMac(mac) {
     return macParts.join(":");
 }
 
-function exists(pattern) {
-    return glob.sync(peersPath + "/" + pattern).length > 0;
+function findNodeFiles(pattern) {
+    return glob.sync(peersPath + "/" + pattern);
+}
+
+function generateToken() {
+    return crypto.randomBytes(8).toString("hex");
+}
+
+function isDuplicate(pattern, token) {
+    var files = findNodeFiles(pattern);
+    if (files.length === 0) {
+        return false;
+    }
+
+    if (files.length > 1 || !token) {
+        return true;
+    }
+
+    var file = files[0];
+    return file.substring(file.length - token.length, file.length) !== token;
+}
+
+function checkNoDuplicates(hostname, mac, key, token) {
+    if (isDuplicate(hostname + "@*@*@*", token)) {
+        return new NodeEntryAlreadyExistsError(hostname);
+    }
+
+    if (isDuplicate("*@" + mac + "@*@*", token)) {
+        return new MacEntryAlreadyExistsError(mac);
+    }
+
+    if (key) {
+        if (isDuplicate("*@*@" + key+ "@*", token)) {
+            return new KeyEntryAlreadyExistsError(key);
+        }
+    }
+    return null;
 }
 
 function createNodeFile(req, res, next) {
-    var hostname = normalizeString(req.body.hostname);
-    var key = normalizeString(req.body.key);
-    var email = normalizeString(req.body.email);
-    var nickname = normalizeString(req.body.nickname);
-    var mac = normalizeMac(normalizeString(req.body.mac));
-    var coords = normalizeString(req.body.coords);
+    var postData = getData(req);
 
-    var filename = peersPath + "/" + hostname + "@" + mac + "@" + key;
+    var hostname = normalizeString(postData.hostname);
+    var key = normalizeString(postData.key);
+    var email = normalizeString(postData.email);
+    var nickname = normalizeString(postData.nickname);
+    var mac = normalizeMac(normalizeString(postData.mac));
+    var coords = normalizeString(postData.coords);
+
+    var token = normalizeString(postData.token);
+    var isUpdate = !!token;
+    if (!token) {
+        token = generateToken();
+    }
+
+    var filename = peersPath + "/" + hostname + "@" + mac + "@" + key + "@" + token;
     var data = "";
 
     data += "# Knotenname: " + hostname + "\n";
@@ -160,6 +224,7 @@ function createNodeFile(req, res, next) {
     data += "# Kontakt: " + email + "\n";
     data += "# Koordinaten: " + coords + "\n";
     data += "# MAC: " + mac + "\n";
+    data += "# Token: " + token + "\n";
     if (key) {
         data += "key \"" + key + "\";\n";
     }
@@ -174,41 +239,24 @@ function createNodeFile(req, res, next) {
 
     // since node.js is single threaded we don't need a lock
     
-    var hostnameExists = true;
-    try {
-        hostnameExists = exists(hostname + "@*@*");
-    }
-    catch (err) {
-        return errorHandler(err);
-    }
-
-    if (hostnameExists) {
-        return errorHandler(new NodeEntryAlreadyExistsError(hostname));
-    }
-
-    var macExists = true;
-    try {
-        macExists = exists("*@" + mac + "@*");
-    }
-    catch (err) {
-        return errorHandler(err);
-    }
-
-    if (macExists) {
-        return errorHandler(new MacEntryAlreadyExistsError(mac));
-    }
-
-    if (key) {
-        var keyExists = true;
-        try {
-            keyExists = exists("*@*@" + key);
-        }
-        catch (err) {
-            return errorHandler(err);
+    var e;
+    if (isUpdate) {
+        var files = findNodeFiles("*@*@*@" + token);
+        if (files.length !== 1) {
+            return next(new NodeNotFoundError(token));
         }
 
-        if (keyExists) {
-            return errorHandler(new KeyEntryAlreadyExistsError(key));
+        e = checkNoDuplicates(hostname, mac, key, token);
+        if (e) {
+            return errorHandler(e);
+        }
+
+        var file = files[0];
+        fs.unlinkSync(file);
+    } else {
+        e = checkNoDuplicates(hostname, mac, key, null);
+        if (e) {
+            return errorHandler(e);
         }
     }
 
@@ -222,10 +270,61 @@ function createNodeFile(req, res, next) {
     console.log("Created new node file: " + filename);
 
     res.writeHead(200, {"Content-Type": "application/json"});
-    res.end(JSON.stringify({ status: "success" }));
+    res.end(JSON.stringify({ status: "success", token: token }));
+}
+
+function getNodeData(req, res, next) {
+    var token = normalizeString(getData(req).token);
+
+    var files = findNodeFiles("*@*@*@" + token);
+    if (files.length !== 1) {
+        return next(new NodeNotFoundError(token));
+    }
+
+    var file = files[0];
+    var lines = fs.readFileSync(file).toString();
+
+    var data = {};
+
+    _.each(lines.split("\n"), function (line) {
+        var linePrefixes = {
+            hostname: "# Knotenname: ",
+            nickname: "# Ansprechpartner: ",
+            email: "# Kontakt: ",
+            coords: "# Koordinaten: ",
+            mac: "# MAC: ",
+            token: "# Token: "
+        };
+
+        var match = _.reduce(linePrefixes, function (match, prefix, key) {
+            if (!_.isEmpty(match)) {
+                return match;
+            }
+
+            if (line.substring(0, prefix.length) === prefix) {
+                match[key] = normalizeString(line.substr(prefix.length));
+                return match;
+            }
+
+            return {};
+        }, {});
+
+        if (_.isEmpty(match) && line.substring(0, 5) === "key \"") {
+            match.key = normalizeString(line.split("\"")[1]);
+        }
+
+        _.each(match, function (value, key) {
+            data[key] = value;
+        });
+    });
+
+    res.writeHead(200, {"Content-Type": "application/json"});
+    res.end(JSON.stringify(data));
 }
 
 app.post("/api/node", validate(constraints), createNodeFile);
+app.put("/api/node/:token", validate(constraintsWithToken), createNodeFile);
+app.get("/api/node/:token", validate(tokenConstraint), getNodeData);
 
 function respondWithJson(res, code, data) {
     res.writeHead(code, {"Content-Type": "application/json"});
@@ -261,8 +360,15 @@ app.use(function(err, req, res, next) {
             key: err.getKey()
         });
     }
-    else if (err) {
-        console.log(JSON.stringify(err));
+    else if (err instanceof NodeNotFoundError) {
+        return respondWithJson(res, 404, {
+            status: "error",
+            type: "NodeNotFoundError",
+            token: err.getToken()
+        });
+    }
+    else if (_.isObject(err)) {
+        console.trace("Internal error:", JSON.stringify(err));
         return respondWithJson(res, 500, {
             status: "error",
             type: "internal"
