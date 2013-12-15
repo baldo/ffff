@@ -19,7 +19,8 @@ for file in *; do
         host=$(grep "^# Knotenname:" -- "$file" | cut -d ' ' -f 3)
         mac=$(grep "^# MAC:" -- "$file" | cut -d ' ' -f 3)
         key=$(grep "^key " -- "$file" | cut -d '"' -f 2)
-        mv -- "$file" "$host@$mac@$key"
+        token=$(grep "^# Token:" -- "$file" | cut -d ' ' -f 3)
+        mv -- "$file" "$host@$mac@$key@$token"
     fi
 done
 
