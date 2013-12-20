@@ -32,7 +32,7 @@ for file in *; do
                 cat $file
                 echo "# Token: $(genToken)"
             ) > $tmp
-            mv $tmp $file
+            mv -f -- $tmp $file
         fi
     fi
 done
