@@ -29,10 +29,10 @@ for file in *; do
         if [ -z "$token" ] && [ ! -z "$mac" ]; then
             tmp=$(mktemp)
             (
-                cat $file
+                cat -- "$file"
                 echo "# Token: $(genToken)"
             ) > $tmp
-            mv -f -- $tmp $file
+            mv -f -- "$tmp" "$file"
         fi
     fi
 done
