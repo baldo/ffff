@@ -270,7 +270,7 @@ function createNodeFile(req, res, next) {
     console.log("Created new node file: " + filename);
 
     res.writeHead(200, {"Content-Type": "application/json"});
-    res.end(JSON.stringify({ status: "success", token: token }));
+    res.end(JSON.stringify(_.defaults({ status: "success", token: token }, postData)));
 }
 
 function getNodeData(req, res, next) {
