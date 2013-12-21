@@ -33,6 +33,7 @@ for file in *; do
                 echo "# Token: $(genToken)"
             ) > $tmp
             mv -f -- "$tmp" "$file"
+            chmod 644 "$file"
         fi
     fi
 done
