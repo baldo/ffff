@@ -100,7 +100,7 @@ app.get("/", function(req, res, next) {
 var constraints = {
     hostname: /^[-a-zA-Z0-9_]{1,32}$/,
     key: /^([a-fA-F0-9]{64})?$/,
-    email: /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/,
+    email: /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/,
     nickname: /^[-a-zA-Z0-9_ äöüÄÖÜß]{1,64}$/,
     mac: /^([a-fA-F0-9]{12}|([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})$/,
     coords: /^(-?[0-9]{1,3}(\.[0-9]{1,15})? -?[0-9]{1,3}(\.[0-9]{1,15})?)?$/
@@ -184,16 +184,16 @@ function isDuplicate(pattern, token) {
 }
 
 function checkNoDuplicates(hostname, mac, key, token) {
-    if (isDuplicate(hostname + "@*@*@*", token)) {
+    if (isDuplicate(hostname.toLowerCase() + "@*@*@*", token)) {
         return new NodeEntryAlreadyExistsError(hostname);
     }
 
-    if (isDuplicate("*@" + mac + "@*@*", token)) {
+    if (isDuplicate("*@" + mac.toLowerCase() + "@*@*", token)) {
         return new MacEntryAlreadyExistsError(mac);
     }
 
     if (key) {
-        if (isDuplicate("*@*@" + key+ "@*", token)) {
+        if (isDuplicate("*@*@" + key.toLowerCase() + "@*", token)) {
             return new KeyEntryAlreadyExistsError(key);
         }
     }
